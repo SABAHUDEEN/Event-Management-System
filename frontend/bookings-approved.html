@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Approved Bookings - The Food Bros Event</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+  <div class="container">
+    <div id="alertBox"></div>
+    <div class="card">
+      <div class="card-header">Approved Bookings</div>
+      <div class="card-body" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>#</th><th>Booking ID</th><th>Name</th><th>Mobile</th><th>Email</th><th>Booking Date</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody id="rows"><tr><td colspan="8" class="text-center text-muted">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/modal.js"></script>
+  <script src="js/nav.js"></script>
+  <script src="js/booking-detail.js"></script>
+  <script>
+    Auth.requireLogin();
+
+    async function load() {
+      try {
+        const data = await api.get('/bookings/approved');
+        const rows = data.bookings.map((b, i) => `
+          <tr>
+            <td>${i + 1}</td><td>${b.BookingID}</td><td>${b.Name}</td>
+            <td>${b.MobileNumber}</td><td>${b.Email}</td>
+            <td><span class="badge badge-info">${b.BookingDate}</span></td>
+            <td><span class="badge badge-success">${b.Status}</span></td>
+            <td>
+              <button class="btn btn-sm btn-secondary" onclick="viewBooking(${b.ID})">View</button>
+              <a class="btn btn-sm btn-royal" href="invoice.html?id=${b.ID}">Invoice</a>
+            </td>
+          </tr>`).join('');
+        document.getElementById('rows').innerHTML = rows ||
+          '<tr><td colspan="8" class="text-center text-muted">No approved bookings.</td></tr>';
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    }
+
+    async function viewBooking(id) {
+      const { booking } = await api.get('/bookings/' + id);
+      Modal.open('Booking Details', bookingDetailHtml(booking), 'modal-xl');
+    }
+
+    load();
+  </script>
+</body>
+</html>

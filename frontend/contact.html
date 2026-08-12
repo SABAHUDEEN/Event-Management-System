@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact Us - The Food Bros Event</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+  <div class="container">
+    <div class="row" style="justify-content:center;">
+      <div class="col-4" style="min-width:400px;">
+        <div id="alertBox"></div>
+        <div class="card">
+          <div class="card-header">Contact Us</div>
+          <div class="card-body" id="contactBody">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    Auth.requireLogin();
+    (async function () {
+      try {
+        const { company } = await api.get('/contact');
+        if (!company) {
+          document.getElementById('contactBody').innerHTML = '<p class="text-muted">No company information available.</p>';
+          return;
+        }
+        document.getElementById('contactBody').innerHTML = `
+          <p><strong>${company.companyname || ''}</strong></p>
+          <p>✉️ ${company.companyemail || ''}</p>
+          <p>☎️ ${company.companyphone || ''}</p>
+          <p>📍 ${company.companyaddress || ''}</p>
+          <p>🌐 ${company.country || ''}</p>`;
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    })();
+  </script>
+</body>
+</html>

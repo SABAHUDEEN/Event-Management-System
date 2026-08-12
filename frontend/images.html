@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Images - The Food Bros Event</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+  <div class="container">
+    <div id="alertBox"></div>
+    <div class="card">
+      <div class="card-header">Company Logo</div>
+      <div class="card-body" id="logoBody">Loading...</div>
+    </div>
+    <div class="card">
+      <div class="card-header">Staff Photos</div>
+      <div class="card-body row" id="staffBody"></div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    Auth.requireLogin();
+    const API_ORIGIN = API_BASE.replace('/api', '');
+
+    (async function () {
+      try {
+        const { company, admins } = await api.get('/images');
+        document.getElementById('logoBody').innerHTML = company && company.companylogo
+          ? `<img src="${API_ORIGIN}/uploads/logos/${company.companylogo}" style="max-height:150px;" onerror="this.style.display='none'">`
+          : '<p class="text-muted">No logo uploaded yet.</p>';
+
+        document.getElementById('staffBody').innerHTML = admins.map(a => {
+          const photo = a.Photo && a.Photo !== 'avatar15.jpg'
+            ? `<img src="${API_ORIGIN}/uploads/profiles/${a.Photo}" style="width:80px;height:80px;object-fit:cover;border-radius:50%;" onerror="this.style.display='none'">`
+            : `<div style="font-size:2.5rem;color:#ccc;">👤</div>`;
+          return `<div class="col text-center" style="flex:0 0 140px;">${photo}<div style="font-size:0.85rem;">${a.FirstName} ${a.LastName}</div></div>`;
+        }).join('');
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    })();
+  </script>
+</body>
+</html>

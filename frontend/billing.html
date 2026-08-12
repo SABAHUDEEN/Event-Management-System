@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Billing - The Food Bros Event</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+  <div class="container">
+    <div id="alertBox"></div>
+    <div class="card">
+      <div class="card-header">
+        <span>Billing</span>
+        <button class="btn btn-royal btn-sm" id="openAddBill">+ Create Bill</button>
+      </div>
+      <div class="card-body" style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>Bill No</th><th>Booking ID</th><th>Customer</th>
+              <th>Amount</th><th>Tax</th><th>Discount</th><th>Total</th>
+              <th>Status</th><th>Bill Date</th><th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="rows"><tr><td colspan="11" class="text-center text-muted">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/modal.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    Auth.requireLogin();
+
+    function statusBadge(status) {
+      if (status === 'Paid') return 'badge-success';
+      if (status === 'Partially Paid') return 'badge-info';
+      return 'badge-danger';
+    }
+
+    async function load() {
+      try {
+        const { bills } = await api.get('/billing');
+        const rows = bills.map((b, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${b.BillNo}</td>
+            <td>${b.BookingRefID}</td>
+            <td>${b.CustomerName}</td>
+            <td>₹${Number(b.Amount).toFixed(2)}</td>
+            <td>${Number(b.TaxPercent)}%</td>
+            <td>₹${Number(b.Discount).toFixed(2)}</td>
+            <td><strong>₹${Number(b.TotalAmount).toFixed(2)}</strong></td>
+            <td><span class="badge ${statusBadge(b.PaymentStatus)}">${b.PaymentStatus}</span></td>
+            <td>${b.BillDate}</td>
+            <td>
+              <button class="btn btn-sm btn-secondary" onclick="viewBill(${b.ID})">View</button>
+              <button class="btn btn-sm btn-royal" onclick="openStatus(${b.ID}, '${b.PaymentStatus}')">Status</button>
+              <button class="btn btn-sm btn-danger" onclick="removeBill(${b.ID})">Delete</button>
+            </td>
+          </tr>`).join('');
+        document.getElementById('rows').innerHTML = rows ||
+          '<tr><td colspan="11" class="text-center text-muted">No bills yet.</td></tr>';
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    }
+
+    // ---- Create Bill ----
+    document.getElementById('openAddBill').addEventListener('click', async () => {
+      try {
+        const { bookings } = await api.get('/billing/eligible-bookings');
+        if (bookings.length === 0) {
+          Modal.open('Create Bill', `<p class="text-muted">There are no approved bookings without a bill yet. Approve a booking first, or every approved booking is already billed.</p>`);
+          return;
+        }
+        const options = bookings.map(b =>
+          `<option value="${b.ID}" data-price="${b.TotalServicePrice || 0}">#${b.BookingID} — ${b.Name} (${b.ServiceNames || 'No service'})</option>`
+        ).join('');
+
+        Modal.open('Create Bill', `
+          <form id="billForm">
+            <div class="form-group">
+              <label>Booking</label>
+              <select name="bookingId" id="bookingSelect" required>
+                <option value="">Choose booking</option>${options}
+              </select>
+            </div>
+            <div class="row">
+              <div class="col form-group"><label>Amount (₹)</label><input type="number" step="0.01" name="amount" id="amountInput" min="0.01" required></div>
+              <div class="col form-group"><label>Tax (%)</label><input type="number" step="0.01" name="taxPercent" value="0" min="0"></div>
+            </div>
+            <div class="row">
+              <div class="col form-group"><label>Discount (₹)</label><input type="number" step="0.01" name="discount" value="0" min="0"></div>
+              <div class="col form-group"><label>Payment Mode</label>
+                <select name="paymentMode">
+                  <option value="">Not specified</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card</option>
+                  <option value="UPI">UPI</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group"><label>Notes</label><textarea name="notes" rows="2"></textarea></div>
+            <button type="submit" class="btn btn-royal w-100">Create Bill</button>
+          </form>
+        `);
+
+        // Auto-fill amount from the booking's service price when a booking is picked.
+        document.getElementById('bookingSelect').addEventListener('change', (e) => {
+          const opt = e.target.selectedOptions[0];
+          const price = opt ? opt.getAttribute('data-price') : '';
+          document.getElementById('amountInput').value = price || '';
+        });
+
+        document.getElementById('billForm').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const body = Object.fromEntries(new FormData(e.target).entries());
+          try {
+            const data = await api.post('/billing', body);
+            Modal.close();
+            showAlert('alertBox', data.message, 'success');
+            load();
+          } catch (err) { alert(err.message); }
+        });
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    });
+
+    // ---- View Bill ----
+    async function viewBill(id) {
+      const { bill } = await api.get('/billing/' + id);
+      Modal.open('Bill Details — ' + bill.BillNo, `
+        <table>
+          <tr><th>Bill No</th><td>${bill.BillNo}</td><th>Booking ID</th><td>${bill.BookingRefID}</td></tr>
+          <tr><th>Customer</th><td>${bill.CustomerName}</td><th>Mobile</th><td>${bill.MobileNumber}</td></tr>
+          <tr><th>Event Date</th><td>${bill.EventDate || ''}</td><th>Venue</th><td>${bill.VenueAddress || ''}</td></tr>
+          <tr><th>Service</th><td colspan="3">${bill.ServiceNames || ''} — ${bill.ServiceDescriptions || ''}</td></tr>
+          <tr><th>Amount</th><td>₹${Number(bill.Amount).toFixed(2)}</td><th>Tax</th><td>${Number(bill.TaxPercent)}%</td></tr>
+          <tr><th>Discount</th><td>₹${Number(bill.Discount).toFixed(2)}</td><th>Total</th><td><strong>₹${Number(bill.TotalAmount).toFixed(2)}</strong></td></tr>
+          <tr><th>Payment Status</th><td>${bill.PaymentStatus}</td><th>Payment Mode</th><td>${bill.PaymentMode || '-'}</td></tr>
+          <tr><th>Notes</th><td colspan="3">${bill.Notes || '-'}</td></tr>
+        </table>
+        <p class="text-center mt-3"><button class="btn btn-royal" onclick="window.print()">Print Bill</button></p>
+      `, 'modal-lg');
+    }
+
+    // ---- Update Status ----
+    function openStatus(id, currentStatus) {
+      Modal.open('Update Payment Status', `
+        <form id="statusForm">
+          <div class="form-group">
+            <label>Payment Status</label>
+            <select name="paymentStatus" required>
+              <option value="Unpaid" ${currentStatus === 'Unpaid' ? 'selected' : ''}>Unpaid</option>
+              <option value="Partially Paid" ${currentStatus === 'Partially Paid' ? 'selected' : ''}>Partially Paid</option>
+              <option value="Paid" ${currentStatus === 'Paid' ? 'selected' : ''}>Paid</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Payment Mode</label>
+            <select name="paymentMode">
+              <option value="">Not specified</option>
+              <option value="Cash">Cash</option>
+              <option value="Card">Card</option>
+              <option value="UPI">UPI</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-royal w-100">Update</button>
+        </form>
+      `);
+      document.getElementById('statusForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const body = Object.fromEntries(new FormData(e.target).entries());
+        try {
+          const data = await api.post('/billing/' + id + '/status', body);
+          Modal.close();
+          showAlert('alertBox', data.message, 'success');
+          load();
+        } catch (err) { alert(err.message); }
+      });
+    }
+
+    async function removeBill(id) {
+      if (!confirm('Delete this bill? This cannot be undone.')) return;
+      try {
+        const data = await api.del('/billing/' + id);
+        showAlert('alertBox', data.message, 'success');
+        load();
+      } catch (err) { showAlert('alertBox', err.message, 'error'); }
+    }
+
+    load();
+  </script>
+</body>
+</html>

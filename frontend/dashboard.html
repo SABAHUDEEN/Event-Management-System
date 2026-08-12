@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard - The Food Bros Event</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+  <div class="container">
+    <div id="alertBox"></div>
+    <div class="row">
+      <div class="col-4"><div class="stat-card bg-stat-info"><div>Total New Booking</div><h2 id="statNew">-</h2></div></div>
+      <div class="col-4"><div class="stat-card bg-stat-warning"><div>Total Approved Booking</div><h2 id="statApproved">-</h2></div></div>
+    </div>
+    <div class="row">
+      <div class="col-4"><div class="stat-card bg-stat-danger"><div>Total Cancelled Booking</div><h2 id="statCancelled">-</h2></div></div>
+      <div class="col-4"><div class="stat-card bg-stat-success"><div>Total Services</div><h2 id="statServices">-</h2></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Approved Bookings</div>
+      <div class="card-body" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>#</th><th>Booking ID</th><th>Name</th><th>Mobile</th><th>Email</th><th>Booking Date</th><th>Status</th></tr></thead>
+          <tbody id="bookingRows"><tr><td colspan="7" class="text-center text-muted">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    Auth.requireLogin();
+
+    (async function load() {
+      try {
+        const data = await api.get('/dashboard');
+        document.getElementById('statNew').textContent = data.totalnewbooking;
+        document.getElementById('statApproved').textContent = data.totalappbooking;
+        document.getElementById('statCancelled').textContent = data.totalcanbooking;
+        document.getElementById('statServices').textContent = data.totalserv;
+
+        const rows = data.approvedBookings.map((b, i) => `
+          <tr>
+            <td>${i + 1}</td><td>${b.BookingID}</td><td>${b.Name}</td>
+            <td>${b.MobileNumber}</td><td>${b.Email}</td>
+            <td><span class="badge badge-info">${b.BookingDate}</span></td>
+            <td><span class="badge badge-success">${b.Status}</span></td>
+          </tr>`).join('');
+        document.getElementById('bookingRows').innerHTML = rows ||
+          '<tr><td colspan="7" class="text-center text-muted">No approved bookings yet.</td></tr>';
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blocked Users - The Food Bros Event</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+  <div class="container">
+    <div id="alertBox"></div>
+    <div class="card">
+      <div class="card-header">Blocked Users</div>
+      <div class="card-body" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>#</th><th>Staff ID</th><th>Role</th><th>Username</th><th>Name</th><th>Email</th><th>Action</th></tr></thead>
+          <tbody id="rows"><tr><td colspan="7" class="text-center text-muted">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    Auth.requireLogin();
+
+    async function load() {
+      try {
+        const { users } = await api.get('/users/deleted');
+        const rows = users.map((u, i) => `
+          <tr>
+            <td>${i + 1}</td><td>${u.Staffid || ''}</td>
+            <td><span class="badge badge-secondary">${u.AdminName}</span></td>
+            <td>${u.UserName}</td><td>${u.FirstName} ${u.LastName}</td><td>${u.Email || ''}</td>
+            <td><button class="btn btn-sm btn-royal" onclick="restoreUser(${u.ID})">Restore</button></td>
+          </tr>`).join('');
+        document.getElementById('rows').innerHTML = rows ||
+          '<tr><td colspan="7" class="text-center text-muted">No blocked users.</td></tr>';
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    }
+
+    async function restoreUser(id) {
+      if (!confirm('Restore this user?')) return;
+      try {
+        const data = await api.post('/users/' + id + '/restore');
+        showAlert('alertBox', data.message, 'success');
+        load();
+      } catch (err) { showAlert('alertBox', err.message, 'error'); }
+    }
+
+    load();
+  </script>
+</body>
+</html>

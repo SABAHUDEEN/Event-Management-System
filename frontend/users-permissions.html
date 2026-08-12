@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>User Roles - The Food Bros Event</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+  <div class="container">
+    <div id="alertBox"></div>
+    <div class="card">
+      <div class="card-header">User Roles &amp; Permissions</div>
+      <div class="card-body" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>#</th><th>Role</th><th>Create User</th><th>Delete User</th><th>Create Booking</th><th>Update Booking</th><th>Action</th></tr></thead>
+          <tbody id="rows"><tr><td colspan="7" class="text-center text-muted">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/modal.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    Auth.requireLogin();
+
+    async function load() {
+      try {
+        const { permissions } = await api.get('/permissions');
+        const rows = permissions.map((p, i) => `
+          <tr>
+            <td>${i + 1}</td><td><span class="badge badge-secondary">${p.permission}</span></td>
+            <td>${p.createuser ? 'Yes' : 'No'}</td><td>${p.deleteuser ? 'Yes' : 'No'}</td>
+            <td>${p.createbid ? 'Yes' : 'No'}</td><td>${p.updatebid ? 'Yes' : 'No'}</td>
+            <td><button class="btn btn-sm btn-royal" onclick="openEdit(${p.id})">Edit</button></td>
+          </tr>`).join('');
+        document.getElementById('rows').innerHTML = rows;
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    }
+
+    async function openEdit(id) {
+      const { permission } = await api.get('/permissions/' + id);
+      Modal.open('Edit Role Permissions', `
+        <p class="text-muted">Role: <strong>${permission.permission}</strong></p>
+        <form id="editForm">
+          <div class="form-group"><label><input type="checkbox" name="createuser" value="1" ${permission.createuser ? 'checked' : ''}> Can create users</label></div>
+          <div class="form-group"><label><input type="checkbox" name="deleteuser" value="1" ${permission.deleteuser ? 'checked' : ''}> Can delete/block users</label></div>
+          <div class="form-group"><label><input type="checkbox" name="createbid" value="1" ${permission.createbid ? 'checked' : ''}> Can create bookings</label></div>
+          <div class="form-group"><label><input type="checkbox" name="updatebid" value="1" ${permission.updatebid ? 'checked' : ''}> Can update bookings</label></div>
+          <button type="submit" class="btn btn-royal w-100">Save</button>
+        </form>`);
+
+      document.getElementById('editForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const body = {
+          createuser: fd.get('createuser') ? 1 : 0,
+          deleteuser: fd.get('deleteuser') ? 1 : 0,
+          createbid: fd.get('createbid') ? 1 : 0,
+          updatebid: fd.get('updatebid') ? 1 : 0
+        };
+        try {
+          const data = await api.put('/permissions/' + id, body);
+          Modal.close();
+          showAlert('alertBox', data.message, 'success');
+          load();
+        } catch (err) { alert(err.message); }
+      });
+    }
+
+    load();
+  </script>
+</body>
+</html>

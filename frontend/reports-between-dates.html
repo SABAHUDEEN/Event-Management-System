@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Between Dates Report - The Food Bros Event</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+  <div class="container">
+    <div id="alertBox"></div>
+    <div class="card">
+      <div class="card-body">
+        <form id="filterForm" class="row" style="align-items:flex-end;">
+          <div class="col form-group"><label>From Date</label><input type="date" name="fdate"></div>
+          <div class="col form-group"><label>To Date</label><input type="date" name="tdate"></div>
+          <div class="col form-group">
+            <button type="submit" class="btn btn-royal">Filter</button>
+            <button type="button" class="btn btn-secondary" id="resetBtn">Reset</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span>Bookings Between Dates</span>
+        <button class="btn btn-royal btn-sm" onclick="window.print()">Print</button>
+      </div>
+      <div class="card-body" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>#</th><th>Booking ID</th><th>Name</th><th>Mobile</th><th>Booking Date</th><th>Status</th></tr></thead>
+          <tbody id="rows"><tr><td colspan="6" class="text-center text-muted">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    Auth.requireLogin();
+
+    async function load(fdate = '', tdate = '') {
+      try {
+        const qs = fdate && tdate ? `?fdate=${fdate}&tdate=${tdate}` : '';
+        const { bookings } = await api.get('/reports/between-dates' + qs);
+        const rows = bookings.map((b, i) => `
+          <tr><td>${i + 1}</td><td>${b.BookingID}</td><td>${b.Name}</td>
+          <td>${b.MobileNumber}</td><td>${b.BookingDate}</td><td>${b.Status || 'Pending'}</td></tr>`).join('');
+        document.getElementById('rows').innerHTML = rows ||
+          '<tr><td colspan="6" class="text-center text-muted">No bookings found for this range.</td></tr>';
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    }
+
+    document.getElementById('filterForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      load(fd.get('fdate'), fd.get('tdate'));
+    });
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      document.getElementById('filterForm').reset();
+      load();
+    });
+
+    load();
+  </script>
+</body>
+</html>

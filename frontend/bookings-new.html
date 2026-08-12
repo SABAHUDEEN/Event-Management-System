@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>New Bookings - The Food Bros Event</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+  <div class="container">
+    <div id="alertBox"></div>
+    <div class="card">
+      <div class="card-header">
+        <span>New Bookings (Pending)</span>
+        <button class="btn btn-royal btn-sm" id="openAddBooking">+ Add Booking</button>
+      </div>
+      <div class="card-body" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>#</th><th>Booking ID</th><th>Name</th><th>Mobile</th><th>Email</th><th>Booking Date</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody id="rows"><tr><td colspan="8" class="text-center text-muted">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/modal.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    Auth.requireLogin();
+    let services = [], eventTypes = [];
+
+    // Builds a 3-part Hour / Minute / AM-PM time selector (returns HTML string)
+    function timeSelectHTML(name) {
+      const hours = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+      const minutes = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+      const hourOpts = hours.map(h => `<option value="${h}">${h}</option>`).join('');
+      const minOpts = minutes.map(m => `<option value="${m}">${m}</option>`).join('');
+      return `
+        <div class="time-select-group" style="display:flex; gap:6px;">
+          <select name="${name}_hh" class="form-control" required>${hourOpts}</select>
+          <select name="${name}_mm" class="form-control" required>${minOpts}</select>
+          <select name="${name}_ampm" class="form-control" required>
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+          </select>
+        </div>`;
+    }
+
+    // Reads back the Hour / Minute / AM-PM selects into a single "hh:mm AM/PM" string
+    function readTimeSelect(form, name) {
+      const hh = form.querySelector(`[name="${name}_hh"]`).value;
+      const mm = form.querySelector(`[name="${name}_mm"]`).value;
+      const ampm = form.querySelector(`[name="${name}_ampm"]`).value;
+      return `${hh}:${mm} ${ampm}`;
+    }
+
+    // Builds a checkbox list so more than one service can be selected
+    function serviceCheckboxHTML(list) {
+      if (!list.length) return '<p class="text-muted">No services available.</p>';
+      return `
+        <div class="service-checkbox-list" style="max-height:160px; overflow-y:auto; border:1px solid #ddd; border-radius:6px; padding:8px;">
+          ${list.map(s => `
+            <label style="display:flex; align-items:center; gap:8px; padding:4px 0; font-weight:normal;">
+              <input type="checkbox" name="serviceid" value="${s.ID}">
+              <span>${s.ServiceName} (₹${s.ServicePrice})</span>
+            </label>`).join('')}
+        </div>`;
+    }
+
+    async function loadBookings() {
+      try {
+        const data = await api.get('/bookings/new');
+        const rows = data.bookings.map((b, i) => `
+          <tr>
+            <td>${i + 1}</td><td>${b.BookingID}</td><td>${b.Name}</td>
+            <td>${b.MobileNumber}</td><td>${b.Email}</td>
+            <td><span class="badge badge-info">${b.BookingDate}</span></td>
+            <td>${b.Status || 'Not Updated Yet'}</td>
+            <td><button class="btn btn-royal btn-sm" onclick="openAction(${b.ID})">Take Action</button></td>
+          </tr>`).join('');
+        document.getElementById('rows').innerHTML = rows ||
+          '<tr><td colspan="8" class="text-center text-muted">No pending bookings.</td></tr>';
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    }
+
+    async function loadOptions() {
+      const [s, e] = await Promise.all([api.get('/services'), api.get('/events')]);
+      services = s.services;
+      eventTypes = e.eventTypes;
+    }
+
+    document.getElementById('openAddBooking').addEventListener('click', async () => {
+      if (services.length === 0) await loadOptions();
+      const eventOptions = eventTypes.map(et => `<option value="${et.EventType}">${et.EventType}</option>`).join('');
+      Modal.open('Add Booking', `
+        <form id="addBookingForm">
+          <div class="row">
+            <div class="col form-group"><label>Full Name</label><input type="text" name="name" required></div>
+            <div class="col form-group"><label>Email</label><input type="email" name="email" required></div>
+          </div>
+          <div class="row">
+            <div class="col form-group"><label>Contact No</label><input type="text" name="contact" pattern="[0-9]{10}" maxlength="10" inputmode="numeric" title="Enter a valid 10-digit mobile number" required></div>
+            <div class="col form-group"><label>Event Date</label><input type="date" name="eventdate" required></div>
+          </div>
+          <div class="row">
+            <div class="col form-group"><label>Event Start Time</label>${timeSelectHTML('est')}</div>
+            <div class="col form-group"><label>Event End Time</label>${timeSelectHTML('eetime')}</div>
+          </div>
+          <div class="form-group"><label>Venue Address</label><textarea name="address" rows="3" required></textarea></div>
+          <div class="row">
+            <div class="col form-group"><label>Type of Event</label>
+              <select name="eventtype" required><option value="">Choose Event Type</option>${eventOptions}</select></div>
+            <div class="col form-group"><label>Services (select one or more)</label>
+              ${serviceCheckboxHTML(services)}</div>
+          </div>
+          <div class="form-group"><label>Additional Information</label><textarea name="info" rows="3"></textarea></div>
+          <button type="submit" class="btn btn-royal w-100">Book</button>
+        </form>
+      `, 'modal-lg');
+
+      document.getElementById('addBookingForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const fd = new FormData(form);
+        const body = Object.fromEntries(fd.entries());
+
+        // Collect every checked service (FormData/Object.fromEntries only keeps the last
+        // value for repeated names, so read the checkboxes directly instead).
+        const selectedServices = Array.from(form.querySelectorAll('input[name="serviceid"]:checked')).map(cb => cb.value);
+        if (selectedServices.length === 0) {
+          alert('Please select at least one service.');
+          return;
+        }
+        body.serviceid = selectedServices.join(',');
+
+        // Combine the Hour / Minute / AM-PM selects back into single time strings
+        body.est = readTimeSelect(form, 'est');
+        body.eetime = readTimeSelect(form, 'eetime');
+        delete body.est_hh; delete body.est_mm; delete body.est_ampm;
+        delete body.eetime_hh; delete body.eetime_mm; delete body.eetime_ampm;
+
+        try {
+          const data = await api.post('/bookings', body);
+          Modal.close();
+          showAlert('alertBox', data.message, 'success');
+          loadBookings();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+    });
+
+    async function openAction(id) {
+      const { booking } = await api.get('/bookings/' + id);
+      Modal.open('Take Action', `
+        <p class="text-muted">Booking #${booking.BookingID} — ${booking.Name}</p>
+        <form id="actionForm">
+          <div class="form-group">
+            <label>Company Remarks</label>
+            <textarea name="remark" rows="4" required>${booking.Remark || ''}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select name="status" required>
+              <option value="">Select status</option>
+              <option value="Approved">Approved</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-royal w-100">Update</button>
+        </form>
+      `);
+      document.getElementById('actionForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const body = Object.fromEntries(fd.entries());
+        try {
+          const data = await api.post(`/bookings/${id}/action`, body);
+          Modal.close();
+          showAlert('alertBox', data.message, 'success');
+          loadBookings();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+    }
+
+    loadBookings();
+  </script>
+</body>
+</html>

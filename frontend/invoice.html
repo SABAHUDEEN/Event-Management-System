@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Invoice - The Food Bros Event</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+  <div class="container">
+    <div class="card">
+      <div class="card-body" id="invoiceArea">Loading...</div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    Auth.requireLogin();
+    const id = new URLSearchParams(window.location.search).get('id');
+
+    async function load() {
+      if (!id) {
+        document.getElementById('invoiceArea').innerHTML = '<p class="text-muted">No booking specified.</p>';
+        return;
+      }
+      try {
+        const { booking } = await api.get('/bookings/' + id);
+        const grandTotal = Number(booking.TotalServicePrice || 0);
+        document.getElementById('invoiceArea').innerHTML = `
+          <table>
+            <tr><th colspan="4" class="text-center" style="color:#dc3545;font-size:1.2rem;">Booking Number: ${booking.BookingID}</th></tr>
+            <tr><th>Name of Client</th><td>${booking.Name}</td><th>Mobile Number</th><td>${booking.MobileNumber}</td></tr>
+            <tr><th>Email</th><td>${booking.Email}</td><th>Event Date</th><td>${booking.EventDate}</td></tr>
+            <tr><th class="text-center" colspan="2">Service Name</th><th class="text-center" colspan="2">Service Price</th></tr>
+            <tr><td class="text-center" colspan="2">${booking.ServiceNames || ''}</td><td class="text-center" colspan="2">₹${booking.TotalServicePrice || 0}</td></tr>
+            <tr><th colspan="2" class="text-center">Grand Total</th><td colspan="2" class="text-center">₹${grandTotal}</td></tr>
+          </table>
+          <p class="text-center mt-3"><button class="btn btn-royal" onclick="window.print()">Print Invoice</button></p>
+        `;
+      } catch (err) {
+        document.getElementById('invoiceArea').innerHTML = `<p class="text-muted">${err.message}</p>`;
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

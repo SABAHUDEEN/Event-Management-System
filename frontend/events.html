@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manage Events - The Food Bros Event</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="navbar"></div>
+  <div class="container">
+    <div id="alertBox"></div>
+    <div class="row">
+      <div class="col-4" id="addEventCol" style="display:none;">
+        <div class="card">
+          <div class="card-header">Add Event Type</div>
+          <div class="card-body">
+            <form id="addForm">
+              <div class="form-group"><label>Event Name</label><input type="text" name="event" required></div>
+              <button type="submit" class="btn btn-royal w-100">Add</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="col-8" id="eventListCol">
+        <div class="card">
+          <div class="card-header">Event Types</div>
+          <div class="card-body" style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>#</th><th>Event Type</th><th>Created</th><th>Action</th></tr></thead>
+              <tbody id="rows"><tr><td colspan="4" class="text-center text-muted">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/nav.js"></script>
+  <script>
+    Auth.requireLogin();
+    const currentUser = Auth.getUser();
+    const isAdmin = currentUser && currentUser.adminName === 'Admin';
+
+    // Admins get the Add form and a full column width for the list;
+    // regular Users only see the list, view-only.
+    if (isAdmin) {
+      document.getElementById('addEventCol').style.display = '';
+    } else {
+      document.getElementById('eventListCol').classList.remove('col-8');
+      document.getElementById('eventListCol').classList.add('col');
+    }
+
+    async function load() {
+      try {
+        const { eventTypes } = await api.get('/events');
+        const rows = eventTypes.map((e, i) => `
+          <tr>
+            <td>${i + 1}</td><td>${e.EventType}</td><td>${e.CreationDate}</td>
+            <td>${isAdmin
+              ? `<button class="btn btn-sm btn-danger" onclick="removeEvent(${e.ID})">Delete</button>`
+              : `<span class="badge badge-secondary">View only</span>`}</td>
+          </tr>`).join('');
+        document.getElementById('rows').innerHTML = rows ||
+          '<tr><td colspan="4" class="text-center text-muted">No event types yet.</td></tr>';
+      } catch (err) {
+        showAlert('alertBox', err.message, 'error');
+      }
+    }
+
+    if (isAdmin) {
+      document.getElementById('addForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const body = Object.fromEntries(new FormData(e.target).entries());
+        try {
+          const data = await api.post('/events', body);
+          showAlert('alertBox', data.message, 'success');
+          e.target.reset();
+          load();
+        } catch (err) { showAlert('alertBox', err.message, 'error'); }
+      });
+    }
+
+    async function removeEvent(id) {
+      if (!confirm('Delete this event type?')) return;
+      try {
+        const data = await api.del('/events/' + id);
+        showAlert('alertBox', data.message, 'success');
+        load();
+      } catch (err) { showAlert('alertBox', err.message, 'error'); }
+    }
+
+    load();
+  </script>
+</body>
+</html>
